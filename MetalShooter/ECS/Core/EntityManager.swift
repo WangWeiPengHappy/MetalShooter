@@ -495,4 +495,31 @@ class EntityManager {
         print("待移除组件数: \(componentsToRemove.count)")
         print("==========================")
     }
+    
+    /// 获取实体总数
+    func getEntityCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return activeEntities.count
+    }
+    
+    /// 清理所有资源
+    func cleanup() {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        print("🧹 EntityManager 开始清理...")
+        
+        // 清理所有实体和组件
+        activeEntities.removeAll()
+        componentStorage.removeAll()
+        entityToComponents.removeAll()
+        componentToEntities.removeAll()
+        componentPools.removeAll()
+        entitiesToDestroy.removeAll()
+        componentsToAdd.removeAll()
+        componentsToRemove.removeAll()
+        
+        print("✅ EntityManager 清理完成")
+    }
 }

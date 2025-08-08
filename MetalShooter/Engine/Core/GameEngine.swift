@@ -37,6 +37,12 @@ class GameEngine: NSObject {
     /// 时间管理器
     private let timeManager = Time.shared
     
+    /// 输入管理器
+    private let inputManager = InputManager.shared
+    
+    /// 玩家控制器
+    private var playerController: PlayerController?
+    
     /// Metal视图
     private var metalView: MTKView?
     
@@ -73,6 +79,9 @@ class GameEngine: NSObject {
     
     /// 获取实体管理器（用于测试）
     var currentEntityManager: EntityManager { return entityManager }
+    
+    /// 获取PlayerController（用于测试）
+    var currentPlayerController: PlayerController? { return playerController }
 
     // MARK: - 初始化    /// 初始化游戏引擎
     func initialize() {
@@ -87,13 +96,19 @@ class GameEngine: NSObject {
         // 3. 初始化渲染器
         initializeRenderer()
         
-        // 4. 注册游戏系统
+        // 4. 初始化输入管理器
+        initializeInputManager()
+        
+        // 5. 初始化玩家控制器
+        initializePlayerController()
+        
+        // 6. 注册游戏系统
         registerGameSystems()
         
-        // 5. 初始化所有系统
+        // 7. 初始化所有系统
         initializeGameSystems()
         
-        // 6. 创建测试场景
+        // 8. 创建测试场景
         createTestScene()
         
         print("✅ GameEngine 初始化完成")
@@ -150,6 +165,26 @@ class GameEngine: NSObject {
         renderer.initialize(with: metalView)
         
         print("🎨 渲染器初始化完成")
+    }
+    
+    /// 初始化输入管理器
+    private func initializeInputManager() {
+        guard let gameWindow = gameWindow else {
+            fatalError("❌ 游戏窗口未设置")
+        }
+        
+        inputManager.initialize(window: gameWindow)
+        print("🎮 输入管理器初始化完成")
+    }
+    
+    /// 初始化玩家控制器
+    private func initializePlayerController() {
+        playerController = PlayerController(entityManager: entityManager)
+        
+        // 将玩家控制器注册为输入监听器
+        inputManager.addInputListener(playerController!)
+        
+        print("👤 玩家控制器初始化完成")
     }
     
     // MARK: - 系统管理
@@ -269,6 +304,14 @@ class GameEngine: NSObject {
         // 更新时间
         timeManager.update()
         
+        // 处理待处理的实体和组件操作
+        entityManager.processPendingOperations()
+        
+        // 更新玩家控制器
+        if let playerController = playerController {
+            playerController.update(deltaTime: timeManager.deltaTime)
+        }
+        
         // 更新所有游戏系统
         for system in gameSystems {
             system.update(deltaTime: timeManager.deltaTime, entityManager: entityManager)
@@ -306,6 +349,42 @@ class GameEngine: NSObject {
                      entityManager.getEntityCount(),
                      frameCount)
     }
+    
+    // MARK: - 清理资源
+    
+    /// 清理游戏引擎资源
+    func shutdown() {
+        print("🛑 GameEngine 开始清理...")
+        
+        // 停止游戏循环
+        stop()
+        
+        // 清理玩家控制器
+        if let playerController = playerController {
+            inputManager.removeInputListener(playerController)
+            playerController.cleanup()
+            self.playerController = nil
+        }
+        
+        // 清理输入管理器
+        inputManager.cleanup()
+        
+        // 清理所有游戏系统
+        for system in gameSystems {
+            system.cleanup()
+        }
+        gameSystems.removeAll()
+        
+        // 清理实体
+        entityManager.cleanup()
+        
+        print("✅ GameEngine 清理完成")
+    }
+    
+    deinit {
+        shutdown()
+        print("🗑️ GameEngine 已销毁")
+    }
 }
 
 // MARK: - 游戏系统协议
@@ -323,14 +402,4 @@ protocol GameSystem: AnyObject {
     
     /// 系统清理
     func cleanup()
-}
-
-// MARK: - 扩展EntityManager
-
-extension EntityManager {
-    /// 获取实体总数
-    func getEntityCount() -> Int {
-        // 需要在EntityManager中实现这个方法
-        return 1 // 临时返回值
-    }
 }

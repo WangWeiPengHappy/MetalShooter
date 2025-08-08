@@ -420,8 +420,11 @@ extension MetalRenderer: MTKViewDelegate {
     }
     
     public func draw(in view: MTKView) {
-        // 基础渲染循环 - 当前渲染测试三角形
-        renderTestTriangle()
+        // 每帧更新游戏逻辑
+        GameEngine.shared.update()
+        
+        // 渲染当前帧
+        GameEngine.shared.render()
     }
 }
 
