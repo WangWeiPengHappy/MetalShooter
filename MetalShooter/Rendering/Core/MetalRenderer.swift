@@ -48,6 +48,9 @@ public class MetalRenderer: NSObject {
     /// Lighting数据缓冲区
     private var lightingDataBuffer: MTLBuffer!
     
+    /// 帧计数器 - 用于调试
+    private var currentFrameIndex = 0
+    
     // MARK: - 渲染参数
     
     /// 视口大小
@@ -376,6 +379,9 @@ public class MetalRenderer: NSObject {
         
         // 更新缓冲区索引
         currentUniformIndex = (currentUniformIndex + 1) % maxBuffersInFlight
+        
+        // 增加帧计数器
+        currentFrameIndex += 1
     }
     
     /// 获取当前Uniform缓冲区
@@ -394,11 +400,14 @@ public class MetalRenderer: NSObject {
     func renderTestTriangle() {
         guard let (renderEncoder, commandBuffer) = beginFrame() else { return }
         
+        // 更新Uniform缓冲区
+        updateUniformsWithCamera()
+        
         // 使用预创建的顶点缓冲区
         renderEncoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
         
-        // 设置lighting缓冲区 (即使着色器不使用，Metal可能仍然需要)
-        renderEncoder.setVertexBuffer(lightingDataBuffer, offset: 0, index: 1)
+        // 设置uniform缓冲区
+        renderEncoder.setVertexBuffer(getCurrentUniformBuffer(), offset: 0, index: 1)
         
         // 调试：添加调试组标记
         renderEncoder.pushDebugGroup("Test Triangle Rendering")
@@ -409,6 +418,64 @@ public class MetalRenderer: NSObject {
         renderEncoder.popDebugGroup()
         
         endFrame(renderEncoder: renderEncoder, commandBuffer: commandBuffer)
+    }
+    
+    /// 使用摄像机更新Uniforms
+    private func updateUniformsWithCamera() {
+        let uniformBuffer = getCurrentUniformBuffer()
+        let uniformsPointer = uniformBuffer.contents().bindMemory(to: Uniforms.self, capacity: 1)
+        
+        // 添加更详细的调试信息
+        if currentFrameIndex % 60 == 0 {
+            let allCameras = CameraSystem.shared.getAllCameras()
+            print("🔍 摄像机调试: 注册摄像机数量=\(allCameras.count)")
+        }
+        
+        // 获取主摄像机
+        if let mainCamera = CameraSystem.shared.getMainCamera() {
+            
+            // 模型矩阵（单位矩阵，因为是测试三角形）
+            uniformsPointer.pointee.modelMatrix = Float4x4(1.0)
+            
+            // 视图矩阵（从摄像机获取）
+            uniformsPointer.pointee.viewMatrix = mainCamera.viewMatrix
+            
+            // 投影矩阵（从摄像机获取）
+            uniformsPointer.pointee.projectionMatrix = mainCamera.projectionMatrix
+            
+            // 添加调试信息（只每60帧打印一次以避免日志过多）
+            if currentFrameIndex % 60 == 0 {
+                let pos = mainCamera.position
+                print("📷 摄像机矩阵更新: 位置=(\(pos.x), \(pos.y), \(pos.z))")
+                print("   视图矩阵[0]=[第一行: \(mainCamera.viewMatrix.columns.0)]")
+            }
+            
+        } else {
+            // 如果没有摄像机，使用默认矩阵
+            uniformsPointer.pointee.modelMatrix = Float4x4(1.0)
+            uniformsPointer.pointee.viewMatrix = Float4x4(1.0)
+            uniformsPointer.pointee.projectionMatrix = createDefaultProjectionMatrix()
+            
+            if currentFrameIndex % 60 == 0 {
+                print("⚠️ 警告: 没有找到主摄像机，使用默认矩阵")
+            }
+        }
+    }
+    
+    /// 创建默认投影矩阵
+    private func createDefaultProjectionMatrix() -> Float4x4 {
+        let aspect = Float(viewportSize.width / viewportSize.height)
+        let fovY = Float.pi / 3.0  // 60度
+        let near: Float = 0.1
+        let far: Float = 1000.0
+        
+        let f = 1.0 / tan(fovY / 2.0)
+        return Float4x4([
+            [f / aspect, 0, 0, 0],
+            [0, f, 0, 0],
+            [0, 0, (far + near) / (near - far), (2 * far * near) / (near - far)],
+            [0, 0, -1, 0]
+        ])
     }
 }
 

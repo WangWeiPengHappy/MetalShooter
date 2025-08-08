@@ -192,6 +192,7 @@ class GameEngine: NSObject {
     /// 注册游戏系统
     private func registerGameSystems() {
         // 按执行顺序添加系统
+        // CameraSystem 是单例，无需添加到gameSystems数组中
         // gameSystems.append(InputSystem())      // 输入系统
         // gameSystems.append(PhysicsSystem())    // 物理系统
         // gameSystems.append(AISystem())         // AI系统
@@ -216,24 +217,22 @@ class GameEngine: NSObject {
     private func createTestScene() {
         print("🎬 创建测试场景...")
         
-        // 创建一个测试实体
-        let testEntity = entityManager.createEntity()
+        // 使用 GameWorldSetup 创建完整的测试场景
+        GameWorldSetup.shared.createBasicTestScene()
         
-        // 添加变换组件
-        let transform = TransformComponent(
-            position: Float3(0, 0, -5),
-            rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
-            scale: Float3(1, 1, 1)
-        )
-        entityManager.addComponent(transform, to: testEntity)
+        // 添加一些障碍物
+        GameWorldSetup.shared.addObstacles()
         
-        // 添加渲染组件
-        let renderComponent = RenderComponent()
-        entityManager.addComponent(renderComponent, to: testEntity)
+        // 创建几个简单敌人
+        _ = GameWorldSetup.shared.createSimpleEnemy(at: Float3(7, 1, -10))
+        _ = GameWorldSetup.shared.createSimpleEnemy(at: Float3(-5, 1, -8))
+        _ = GameWorldSetup.shared.createSimpleEnemy(at: Float3(2, 1, -15))
         
-        print("✅ 测试场景创建完成")
-        print("   实体数量: 1")
-        print("   测试实体ID: \(testEntity)")
+        print("✅ 完整测试场景创建完成")
+        print("   包含: 地面、墙壁、目标、敌人、障碍物")
+        print("   武器系统: 已激活")
+        print("   碰撞检测: 已激活")
+        print("🎮 射击游戏已准备就绪 - WASD移动，鼠标视角，左键射击，R键装弹")
     }
     
     // MARK: - 游戏循环控制
@@ -311,6 +310,12 @@ class GameEngine: NSObject {
         if let playerController = playerController {
             playerController.update(deltaTime: timeManager.deltaTime)
         }
+        
+        // 更新武器系统
+        WeaponSystem.shared.update(deltaTime: timeManager.deltaTime, currentTime: timeManager.totalTime)
+        
+        // 更新碰撞系统
+        CollisionSystem.shared.update(deltaTime: timeManager.deltaTime)
         
         // 更新所有游戏系统
         for system in gameSystems {

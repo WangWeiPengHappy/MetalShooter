@@ -38,6 +38,7 @@ class PlayerController: InputManager.InputListener {
     init(entityManager: EntityManager) {
         self.entityManager = entityManager
         createPlayerEntity()
+        setupPlayerWeapon()  // 设置玩家武器
         
         // 注册到 InputManager
         InputManager.shared.addInputListener(self)
@@ -72,17 +73,16 @@ class PlayerController: InputManager.InputListener {
     
     // MARK: - InputManager.InputListener 协议实现
     
-    func onKeyPressed(_ keyCode: InputManager.KeyCode) {
-        print("🔑 PlayerController: onKeyPressed - \(keyCode)")
-        switch keyCode {
-        case .w, .a, .s, .d:
-            print("🔑 PlayerController: WASD按键按下 - \(keyCode)")
-            // WASD键的处理在update方法中通过isKeyPressed检查
+    func onKeyPressed(_ key: InputManager.KeyCode) {
+        switch key {
         case .leftShift:
             isSprinting = true
-        case .escape:
-            handleEscapeKey()
+            print("🏃 PlayerController: 开始冲刺")
+        case .r:
+            // 装弹
+            reloadWeapon()
         default:
+            // WASD移动在 update() 中处理
             break
         }
     }
@@ -106,15 +106,17 @@ class PlayerController: InputManager.InputListener {
     }
     
     func onMouseButtonPressed(_ button: InputManager.MouseButton) {
+        guard let playerEntity = playerEntity else { return }
+        
         switch button {
         case .left:
-            // TODO: 射击
-            print("🔫 PlayerController: 开火!")
+            // 射击
+            fireWeapon()
         case .right:
-            // TODO: 瞄准
+            // 瞄准
             print("🎯 PlayerController: 瞄准")
         case .middle:
-            // TODO: 特殊功能
+            // 特殊功能
             break
         }
     }
@@ -338,6 +340,57 @@ class PlayerController: InputManager.InputListener {
     deinit {
         cleanup()
         print("🗑️ PlayerController: 已销毁")
+    }
+    
+    // MARK: - 武器系统相关方法
+    
+    /// 射击武器
+    private func fireWeapon() {
+        guard let playerEntity = playerEntity,
+              let entityManager = entityManager else { return }
+        
+        // 获取当前时间
+        let currentTime = Time.shared.totalTime
+        
+        // 获取射击方向 (相机前方)
+        guard let transform = entityManager.getComponent(TransformComponent.self, for: playerEntity.id) else {
+            print("❌ PlayerController: 无法获取 TransformComponent 进行射击")
+            return
+        }
+        
+        // 计算射击方向 (相机朝前的方向)
+        let forward = transform.forward
+        
+        // 使用武器系统进行射击
+        let success = WeaponSystem.shared.fireWeapon(
+            from: playerEntity.id,
+            direction: forward,
+            currentTime: currentTime
+        )
+        
+        if success {
+            print("🔫 PlayerController: 射击成功! 方向=\(forward)")
+        } else {
+            print("🚫 PlayerController: 射击失败 (可能在装弹或无弹药)")
+        }
+    }
+    
+    /// 装弹武器
+    private func reloadWeapon() {
+        guard let playerEntity = playerEntity else { return }
+        
+        let currentTime = Time.shared.totalTime
+        WeaponSystem.shared.reloadWeapon(entityId: playerEntity.id, currentTime: currentTime)
+        print("🔄 PlayerController: 开始装弹")
+    }
+    
+    /// 为玩家创建默认武器
+    private func setupPlayerWeapon() {
+        guard let playerEntity = playerEntity else { return }
+        
+        // 为玩家创建默认手枪
+        WeaponSystem.shared.createDefaultWeapon(for: playerEntity.id, weaponType: .pistol)
+        print("🎯 PlayerController: 为玩家创建默认武器")
     }
 }
 

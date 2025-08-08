@@ -431,13 +431,19 @@ fragment float point_shadow_fragment(PointShadowVertexOut in [[stage_in]],
 
 // MARK: - 简单着色器 (用于测试)
 
-vertex VertexOut vertex_simple(const VertexIn vertexIn [[stage_in]]) {
+vertex VertexOut vertex_simple(const VertexIn vertexIn [[stage_in]],
+                             constant Uniforms &uniforms [[buffer(1)]]) {
     VertexOut out;
-    out.position = float4(vertexIn.position, 1.0);
-    out.worldPosition = vertexIn.position;
-    out.normal = vertexIn.normal;
-    out.tangent = vertexIn.tangent;
-    out.bitangent = cross(vertexIn.normal, vertexIn.tangent);
+    
+    // 应用模型-视图-投影矩阵变换
+    float4 worldPos = uniforms.modelMatrix * float4(vertexIn.position, 1.0);
+    float4 viewPos = uniforms.viewMatrix * worldPos;
+    out.position = uniforms.projectionMatrix * viewPos;
+    
+    out.worldPosition = worldPos.xyz;
+    out.normal = (uniforms.modelMatrix * float4(vertexIn.normal, 0.0)).xyz;
+    out.tangent = (uniforms.modelMatrix * float4(vertexIn.tangent, 0.0)).xyz;
+    out.bitangent = cross(out.normal, out.tangent);
     out.texCoords = vertexIn.texCoords;
     out.color = vertexIn.color;
     out.shadowCoords0 = float4(0.0);

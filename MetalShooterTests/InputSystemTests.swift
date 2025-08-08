@@ -368,4 +368,167 @@ final class InputSystemTests: XCTestCase {
         
         print("✅ 多帧更新稳定性测试通过")
     }
+    
+    // MARK: - 窗口边界检查测试
+    
+    /// 测试InputManager的窗口边界检查功能
+    func testInputManagerWindowBoundaryCheck() throws {
+        print("🧪 测试InputManager窗口边界检查功能...")
+        
+        let inputManager = InputManager.shared
+        
+        // 创建模拟窗口
+        let mockWindow = createMockWindow()
+        inputManager.setTestWindow(mockWindow)
+        
+        // 测试鼠标在窗口内的情况
+        let mouseInBounds = NSPoint(x: 150, y: 150) // 在窗口内
+        let shouldProcessInBounds = inputManager.shouldProcessMouseEvent(at: mouseInBounds)
+        XCTAssertTrue(shouldProcessInBounds, "鼠标在窗口内时应该处理事件")
+        
+        // 测试鼠标在窗口外的情况
+        let mouseOutOfBounds = NSPoint(x: 350, y: 350) // 在窗口外
+        let shouldProcessOutOfBounds = inputManager.shouldProcessMouseEvent(at: mouseOutOfBounds)
+        XCTAssertFalse(shouldProcessOutOfBounds, "鼠标在窗口外时不应该处理事件")
+        
+        print("✅ 窗口边界检查功能测试通过")
+    }
+    
+    /// 测试窗口边界检查的边缘情况
+    func testInputManagerWindowBoundaryEdgeCases() throws {
+        print("🧪 测试窗口边界检查边缘情况...")
+        
+        let inputManager = InputManager.shared
+        
+        // 测试无窗口的情况
+        inputManager.setTestWindow(nil)
+        let mouseWithoutWindow = NSPoint(x: 100, y: 100)
+        let shouldProcessWithoutWindow = inputManager.shouldProcessMouseEvent(at: mouseWithoutWindow)
+        XCTAssertFalse(shouldProcessWithoutWindow, "无窗口时不应该处理鼠标事件")
+        
+        // 测试窗口边缘的情况
+        let mockWindow = createMockWindow()
+        inputManager.setTestWindow(mockWindow)
+        
+        let windowFrame = mockWindow.frame
+        print("窗口边界: \(windowFrame)")
+        
+        // 测试窗口边界上的点 (窗口: x:100-300, y:100-300)
+        let mouseOnLeftEdge = NSPoint(x: windowFrame.minX, y: windowFrame.minY + windowFrame.height/2) // 左边缘中点
+        let mouseOnRightEdge = NSPoint(x: windowFrame.maxX - 1, y: windowFrame.minY + windowFrame.height/2) // 右边缘中点
+        let mouseOnBottomEdge = NSPoint(x: windowFrame.minX + windowFrame.width/2, y: windowFrame.minY) // 下边缘中点
+        let mouseOnTopEdge = NSPoint(x: windowFrame.minX + windowFrame.width/2, y: windowFrame.maxY - 1) // 上边缘中点
+        
+        // 测试边界点
+        print("测试左边缘点: \(mouseOnLeftEdge)")
+        XCTAssertTrue(inputManager.shouldProcessMouseEvent(at: mouseOnLeftEdge), "左边缘应该被包含")
+        
+        print("测试右边缘点: \(mouseOnRightEdge)")
+        XCTAssertTrue(inputManager.shouldProcessMouseEvent(at: mouseOnRightEdge), "右边缘应该被包含")
+        
+        print("测试下边缘点: \(mouseOnBottomEdge)")
+        XCTAssertTrue(inputManager.shouldProcessMouseEvent(at: mouseOnBottomEdge), "下边缘应该被包含")
+        
+        print("测试上边缘点: \(mouseOnTopEdge)")
+        XCTAssertTrue(inputManager.shouldProcessMouseEvent(at: mouseOnTopEdge), "上边缘应该被包含")
+        
+        // 测试窗口外的点
+        let mouseOutsideLeft = NSPoint(x: windowFrame.minX - 1, y: windowFrame.minY + windowFrame.height/2)
+        let mouseOutsideRight = NSPoint(x: windowFrame.maxX + 1, y: windowFrame.minY + windowFrame.height/2)
+        let mouseOutsideBottom = NSPoint(x: windowFrame.minX + windowFrame.width/2, y: windowFrame.minY - 1)
+        let mouseOutsideTop = NSPoint(x: windowFrame.minX + windowFrame.width/2, y: windowFrame.maxY + 1)
+        
+        XCTAssertFalse(inputManager.shouldProcessMouseEvent(at: mouseOutsideLeft), "窗口左侧外的点不应该被包含")
+        XCTAssertFalse(inputManager.shouldProcessMouseEvent(at: mouseOutsideRight), "窗口右侧外的点不应该被包含")
+        XCTAssertFalse(inputManager.shouldProcessMouseEvent(at: mouseOutsideBottom), "窗口下方外的点不应该被包含")
+        XCTAssertFalse(inputManager.shouldProcessMouseEvent(at: mouseOutsideTop), "窗口上方外的点不应该被包含")
+        
+        print("✅ 窗口边界检查边缘情况测试通过")
+    }
+    
+    /// 测试鼠标移动事件的窗口边界过滤
+    func testMouseMovementFiltering() throws {
+        print("🧪 测试鼠标移动事件的窗口边界过滤...")
+        
+        let inputManager = InputManager.shared
+        var receivedEvents: [CGPoint] = []
+        
+        // 创建模拟监听器来记录收到的事件
+        class MockInputListener: InputManager.InputListener {
+            var receivedEvents: [CGPoint] = []
+            
+            func onKeyPressed(_ keyCode: InputManager.KeyCode) {}
+            func onKeyReleased(_ keyCode: InputManager.KeyCode) {}
+            func onMouseMoved(_ delta: SIMD2<Float>) {
+                // 记录鼠标移动事件（使用delta作为标识）
+                let position = CGPoint(x: CGFloat(delta.x), y: CGFloat(delta.y))
+                receivedEvents.append(position)
+            }
+            func onMouseButtonPressed(_ button: InputManager.MouseButton) {}
+            func onMouseButtonReleased(_ button: InputManager.MouseButton) {}
+            func onMouseScrolled(_ delta: SIMD2<Float>) {}
+            func onGamepadConnected() {}
+            func onGamepadDisconnected() {}
+            func onGamepadInput(_ state: InputManager.GamepadState) {}
+        }
+        
+        let mockListener = MockInputListener()
+        inputManager.addListener(mockListener)
+        
+        // 设置模拟窗口
+        let mockWindow = createMockWindow()
+        inputManager.setTestWindow(mockWindow)
+        
+        // 模拟窗口内的鼠标移动事件
+        let insidePosition = CGPoint(x: 150, y: 150)
+        inputManager.testMouseMovement(at: insidePosition, delta: CGVector(dx: 10, dy: 10))
+        
+        // 模拟窗口外的鼠标移动事件
+        let outsidePosition = CGPoint(x: 350, y: 350)
+        inputManager.testMouseMovement(at: outsidePosition, delta: CGVector(dx: 10, dy: 10))
+        
+        // 验证只有窗口内的事件被处理
+        XCTAssertEqual(mockListener.receivedEvents.count, 1, "应该只收到1个窗口内的鼠标事件")
+        
+        // 验证收到的是窗口内事件的delta值
+        let expectedDelta = CGPoint(x: 10, y: 10)
+        XCTAssertEqual(mockListener.receivedEvents.first, expectedDelta, "收到的事件应该是窗口内事件的delta值")
+        
+        inputManager.removeListener(mockListener)
+        print("✅ 鼠标移动事件窗口边界过滤测试通过")
+    }
+    
+    /// 测试窗口边界检查的性能
+    func testWindowBoundaryCheckPerformance() throws {
+        print("🧪 测试窗口边界检查性能...")
+        
+        let inputManager = InputManager.shared
+        let mockWindow = createMockWindow()
+        inputManager.setTestWindow(mockWindow)
+        
+        // 性能测试：执行大量窗口边界检查
+        measure {
+            for i in 0..<10000 {
+                let x = Double(i % 400)
+                let y = Double((i * 3) % 400)
+                let mousePosition = NSPoint(x: x, y: y)
+                _ = inputManager.shouldProcessMouseEvent(at: mousePosition)
+            }
+        }
+        
+        print("✅ 窗口边界检查性能测试通过")
+    }
+    
+    // MARK: - 辅助方法
+    
+    /// 创建模拟窗口用于测试
+    private func createMockWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 200, height: 200),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        return window
+    }
 }

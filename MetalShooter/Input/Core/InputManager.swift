@@ -31,10 +31,14 @@ class InputManager {
     /// 输入监听器列表
     private var inputListeners: [WeakInputListener] = []
     
+    /// 游戏窗口引用
+    private weak var gameWindow: NSWindow?
+    
     // MARK: - 公共接口
     
     /// 初始化输入管理器（用于设置窗口引用）
     func initialize(window: NSWindow) {
+        gameWindow = window
         print("🎮 InputManager: 使用窗口 \(window) 进行初始化")
     }
     
@@ -248,14 +252,46 @@ class InputManager {
     }
     
     private func handleMouseMovement(_ event: NSEvent) {
-        let delta = SIMD2<Float>(Float(event.deltaX), Float(event.deltaY))
-        mouseState.delta += delta
+        // 检查鼠标是否在游戏窗口内
+        guard let window = gameWindow else {
+            // 如果没有窗口引用，默认处理（兼容性）
+            let delta = SIMD2<Float>(Float(event.deltaX), Float(event.deltaY))
+            mouseState.delta += delta
+            let location = event.locationInWindow
+            mouseState.position = SIMD2<Float>(Float(location.x), Float(location.y))
+            notifyMouseMoved(delta)
+            return
+        }
         
-        // 更新鼠标位置
-        let location = event.locationInWindow
-        mouseState.position = SIMD2<Float>(Float(location.x), Float(location.y))
+        // 获取鼠标在屏幕中的位置
+        let mouseLocationInScreen = NSEvent.mouseLocation
         
-        notifyMouseMoved(delta)
+        // 获取窗口在屏幕中的框架
+        let windowFrame = window.frame
+        
+        // 检查鼠标是否在窗口内
+        let isMouseInWindow = windowFrame.contains(mouseLocationInScreen)
+        
+        if isMouseInWindow {
+            // 鼠标在窗口内，处理移动事件
+            let delta = SIMD2<Float>(Float(event.deltaX), Float(event.deltaY))
+            mouseState.delta += delta
+            
+            // 更新鼠标位置（窗口坐标系）
+            let location = event.locationInWindow
+            mouseState.position = SIMD2<Float>(Float(location.x), Float(location.y))
+            
+            // 通知监听器
+            notifyMouseMoved(delta)
+            
+            // 调试信息（总是显示，方便测试窗口边界检查）
+            print("🖱️ InputManager: 鼠标在窗口内移动 - 位置: (\(Int(mouseState.position.x)), \(Int(mouseState.position.y))), 增量: (\(delta.x), \(delta.y))")
+        } else {
+            // 鼠标在窗口外，不处理移动事件
+            // 可选：清除delta累积
+            mouseState.delta = SIMD2<Float>(0, 0)
+            print("🚫 InputManager: 鼠标在窗口外，忽略移动事件")
+        }
     }
     
     private func handleMouseButton(_ event: NSEvent) {
@@ -491,6 +527,34 @@ class InputManager {
         - 游戏手柄连接: \(gamepadState.isConnected)
         - 监听器数量: \(inputListeners.count)
         """)
+    }
+    
+    // MARK: - 测试辅助方法
+    
+    /// 测试用：检查是否应该处理指定位置的鼠标事件
+    func shouldProcessMouseEvent(at position: NSPoint) -> Bool {
+        guard let window = gameWindow else {
+            return false
+        }
+        return window.frame.contains(position)
+    }
+    
+    /// 测试用：模拟鼠标移动事件
+    func testMouseMovement(at position: CGPoint, delta: CGVector) {
+        let deltaFloat = SIMD2<Float>(Float(delta.dx), Float(delta.dy))
+        
+        // 检查是否应该处理这个事件
+        let nsPosition = NSPoint(x: position.x, y: position.y)
+        if shouldProcessMouseEvent(at: nsPosition) {
+            mouseState.delta += deltaFloat
+            mouseState.position = SIMD2<Float>(Float(position.x), Float(position.y))
+            notifyMouseMoved(deltaFloat)
+        }
+    }
+    
+    /// 测试用：设置游戏窗口
+    func setTestWindow(_ window: NSWindow?) {
+        gameWindow = window
     }
     
     deinit {
