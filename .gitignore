@@ -122,3 +122,7 @@ test_vertex_layout.swift
 
 # Build artifacts
 build/
+
+# AI对话上下文文件（隐私保护）
+.ai-context/
+test_*.txt
