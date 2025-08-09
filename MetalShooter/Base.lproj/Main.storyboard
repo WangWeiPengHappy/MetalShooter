@@ -661,6 +661,12 @@
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="FPS-separator-2"/>
+                                        <menuItem title="showGames" keyEquivalent="g" id="showGames-menu-item">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="showGames:" target="Voe-Tx-rLC" id="showGames-action"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem title="Animation" id="ANIM-parent-item">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <menu key="submenu" title="Animation" id="ANIM-submenu">

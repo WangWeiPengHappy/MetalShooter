@@ -211,4 +211,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         armsMenuItem?.state = armsVisible ? .on : .off
     }
     
+    
+    // MARK: - ShowGames Menu Action
+    
+    /// showGames菜单项点击事件  
+    @IBAction func showGames(_ sender: NSMenuItem) {
+        print("🎮 showGames菜单被点击")
+    }
+    
 }
