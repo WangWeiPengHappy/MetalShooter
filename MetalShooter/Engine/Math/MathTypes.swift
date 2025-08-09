@@ -20,6 +20,9 @@ public typealias Float3 = simd_float3
 /// 4D 浮点向量 (颜色、齐次坐标等)
 public typealias Float4 = simd_float4
 
+/// 3x3 浮点矩阵 (法线变换等)
+public typealias Float3x3 = simd_float3x3
+
 /// 4x4 浮点矩阵 (变换矩阵)
 public typealias Float4x4 = simd_float4x4
 
@@ -674,5 +677,30 @@ extension Ray {
             origin: Float3(transformedOrigin.x, transformedOrigin.y, transformedOrigin.z),
             direction: normalize(Float3(transformedDirection.x, transformedDirection.y, transformedDirection.z))
         )
+    }
+}
+
+// MARK: - 矩阵扩展
+
+extension Float4x4 {
+    /// 提取左上角3x3矩阵(用于法线变换)
+    func upperLeft3x3() -> Float3x3 {
+        return Float3x3(
+            Float3(columns.0.x, columns.0.y, columns.0.z),
+            Float3(columns.1.x, columns.1.y, columns.1.z),
+            Float3(columns.2.x, columns.2.y, columns.2.z)
+        )
+    }
+}
+
+extension Float3x3 {
+    /// 计算3x3矩阵的逆矩阵
+    var inverse: Float3x3 {
+        return simd_inverse(self)
+    }
+    
+    /// 计算3x3矩阵的转置
+    var transpose: Float3x3 {
+        return simd_transpose(self)
     }
 }

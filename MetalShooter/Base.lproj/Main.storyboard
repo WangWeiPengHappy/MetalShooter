@@ -631,6 +631,64 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Tools" id="TLS-m4-X7b">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Tools" id="TLS-sub-menu">
+                                    <items>
+                                        <menuItem title="Show Triangle" keyEquivalent="t" id="TRG-checkbox-item">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="toggleTriangle:" target="Voe-Tx-rLC" id="TRG-toggle-action"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Enable Mouse Capture" keyEquivalent="m" id="MSE-capture-item">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="toggleMouseCapture:" target="Voe-Tx-rLC" id="MSE-capture-action"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="FPS-separator-1"/>
+                                        <menuItem title="Show Weapon" keyEquivalent="w" id="WPN-checkbox-item">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="toggleWeapon:" target="Voe-Tx-rLC" id="WPN-toggle-action"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Show Arms" keyEquivalent="a" id="ARM-checkbox-item">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="toggleArms:" target="Voe-Tx-rLC" id="ARM-toggle-action"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="FPS-separator-2"/>
+                                        <menuItem title="Animation" id="ANIM-parent-item">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" title="Animation" id="ANIM-submenu">
+                                                <items>
+                                                    <menuItem title="Shoot Animation" keyEquivalent="s" id="ANIM-shoot-item">
+                                                        <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                                        <connections>
+                                                            <action selector="playShootAnimation:" target="Voe-Tx-rLC" id="ANIM-shoot-action"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Reload Animation" keyEquivalent="r" id="ANIM-reload-item">
+                                                        <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                                        <connections>
+                                                            <action selector="playReloadAnimation:" target="Voe-Tx-rLC" id="ANIM-reload-action"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Reset Animation" id="ANIM-reset-item">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="resetWeaponAnimation:" target="Voe-Tx-rLC" id="ANIM-reset-action"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Window" id="aUF-d1-5bR">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Window" systemMenu="window" id="Td7-aD-5lo">
@@ -674,7 +732,14 @@
                         <outlet property="delegate" destination="Voe-Tx-rLC" id="PrD-fu-P6m"/>
                     </connections>
                 </application>
-                <customObject id="Voe-Tx-rLC" customClass="AppDelegate" customModule="MetalShooter" customModuleProvider="target"/>
+                <customObject id="Voe-Tx-rLC" customClass="AppDelegate" customModule="MetalShooter" customModuleProvider="target">
+                    <connections>
+                        <outlet property="triangleMenuItem" destination="TRG-checkbox-item" id="TRG-outlet-connection"/>
+                        <outlet property="mouseCaptureMenuItem" destination="MSE-capture-item" id="MSE-capture-outlet"/>
+                        <outlet property="weaponMenuItem" destination="WPN-checkbox-item" id="WPN-checkbox-outlet"/>
+                        <outlet property="armsMenuItem" destination="ARM-checkbox-item" id="ARM-checkbox-outlet"/>
+                    </connections>
+                </customObject>
                 <customObject id="YLy-65-1bz" customClass="NSFontManager"/>
                 <customObject id="Ady-hI-5gd" userLabel="First Responder" customClass="NSResponder" sceneMemberID="firstResponder"/>
             </objects>

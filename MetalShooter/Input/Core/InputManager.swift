@@ -69,6 +69,36 @@ class InputManager {
         print("🎮 InputManager: 清理完成")
     }
     
+    // MARK: - 鼠标捕获控制
+    
+    /// 启用鼠标捕获
+    func enableMouseCapture() {
+        mouseState.isCaptured = true
+        print("🖱️ InputManager: 鼠标捕获已启用")
+    }
+    
+    /// 禁用鼠标捕获
+    func disableMouseCapture() {
+        mouseState.isCaptured = false
+        // 清空鼠标delta，避免残留移动数据影响游戏
+        mouseState.delta = SIMD2<Float>(0, 0)
+        print("🖱️ InputManager: 鼠标捕获已禁用")
+    }
+    
+    /// 切换鼠标捕获状态
+    func toggleMouseCapture() {
+        if mouseState.isCaptured {
+            disableMouseCapture()
+        } else {
+            enableMouseCapture()
+        }
+    }
+    
+    /// 获取鼠标捕获状态
+    var isMouseCaptured: Bool {
+        return mouseState.isCaptured
+    }
+    
     // MARK: - 输入状态结构
     
     /// 鼠标状态
@@ -79,6 +109,7 @@ class InputManager {
         var rightButton: Bool = false
         var middleButton: Bool = false
         var scrollDelta: SIMD2<Float> = SIMD2<Float>(0, 0)
+        var isCaptured: Bool = true  // 鼠标是否被捕获（默认开启）
     }
     
     /// 游戏手柄状态
@@ -239,6 +270,12 @@ class InputManager {
         // 更新键状态
         keyStates[keyCode] = isPressed
         
+        // 特殊处理ESC键 - 禁用鼠标捕获
+        if keyCode == KeyCode.escape.rawValue && isPressed {
+            print("🔓 InputManager: ESC键按下，禁用鼠标捕获")
+            disableMouseCapture()
+        }
+        
         // 通知监听器
         if let mappedKey = KeyCode(rawValue: keyCode) {
             print("⌨️ InputManager: 映射键码成功 - \(mappedKey)")
@@ -252,6 +289,12 @@ class InputManager {
     }
     
     private func handleMouseMovement(_ event: NSEvent) {
+        // 首先检查鼠标是否被捕获
+        guard mouseState.isCaptured else {
+            print("🚫 InputManager: 鼠标未捕获，忽略移动事件")
+            return
+        }
+        
         // 检查鼠标是否在游戏窗口内
         guard let window = gameWindow else {
             // 如果没有窗口引用，默认处理（兼容性）
@@ -309,6 +352,20 @@ class InputManager {
             button = .middle
             mouseState.middleButton = isPressed
         default:
+            return
+        }
+        
+        // 特殊处理：如果鼠标捕获被禁用，左键点击可以重新启用
+        if !mouseState.isCaptured && button == .left && isPressed {
+            print("🔒 InputManager: 鼠标左键点击，重新启用鼠标捕获")
+            enableMouseCapture()
+            // 重新启用后，不传递这次点击事件，避免意外触发游戏操作
+            return
+        }
+        
+        // 只有在鼠标被捕获时才处理按钮事件
+        guard mouseState.isCaptured else {
+            print("🚫 InputManager: 鼠标未捕获，忽略按钮事件")
             return
         }
         

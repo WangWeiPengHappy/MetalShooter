@@ -31,6 +31,9 @@ class GameEngine: NSObject {
     /// 渲染器
     private var renderer: MetalRenderer!
     
+    /// 第一人称渲染器
+    private var firstPersonRenderer: FirstPersonRenderer?
+    
     /// 实体管理器
     private let entityManager = EntityManager.shared
     
@@ -63,6 +66,9 @@ class GameEngine: NSObject {
     /// 游戏系统列表
     private var gameSystems: [GameSystem] = []
     
+    /// 上次快捷键触发时间
+    private var lastHotkeyTime: Float = 0.0
+    
     // MARK: - 公共访问器（用于测试）
     
     /// 获取游戏运行状态
@@ -83,7 +89,54 @@ class GameEngine: NSObject {
     /// 获取PlayerController（用于测试）
     var currentPlayerController: PlayerController? { return playerController }
 
-    // MARK: - 初始化    /// 初始化游戏引擎
+    // MARK: - 快捷键处理
+    
+    /// 处理简单快捷键
+    private func handleSimpleHotkeys() {
+        print("🔑 DEBUG: handleSimpleHotkeys() 方法被调用")
+        
+        // 检查P键：切换玩家模型显示
+        let pKeyPressed = inputManager.isKeyPressed(.p)
+        print("🔑 DEBUG: P键状态 = \(pKeyPressed)")
+        
+        if pKeyPressed {
+            print("🔑 GameEngine: P键被按下！")
+            // 使用简单的时间间隔防止重复触发
+            let currentTime = timeManager.totalTime
+            if currentTime - lastHotkeyTime > 0.3 { // 300ms间隔
+                print("🔑 GameEngine: P键触发间隔检查通过，调用togglePlayerModelVisibility")
+                renderer?.togglePlayerModelVisibility()
+                lastHotkeyTime = currentTime
+            } else {
+                print("🔑 GameEngine: P键触发间隔未满，跳过")
+            }
+        }
+        
+        // 检查M键：运行模型测试
+        if inputManager.isKeyPressed(.m) {
+            let currentTime = timeManager.totalTime
+            if currentTime - lastHotkeyTime > 0.5 { // 500ms间隔，防止重复测试
+                runModelTest()
+                lastHotkeyTime = currentTime
+            }
+        }
+    }
+    
+    /// 运行模型测试
+    private func runModelTest() {
+        print("🧪 运行几何战士模型测试...")
+        GeometricWarriorTest.runAllTests()
+    }
+    
+    /// 设置测试三角形的可见性
+    func setTestTriangleVisible(_ visible: Bool) {
+        renderer?.isTestTriangleVisible = visible
+        print("🔺 设置测试三角形可见性: \(visible)")
+    }
+
+    // MARK: - 初始化
+    
+    /// 初始化游戏引擎
     func initialize() {
         print("🚀 GameEngine 初始化开始...")
         
@@ -164,7 +217,22 @@ class GameEngine: NSObject {
         renderer = MetalRenderer()
         renderer.initialize(with: metalView)
         
+        // 初始化第一人称渲染器
+        initializeFirstPersonRenderer()
+        
         print("🎨 渲染器初始化完成")
+    }
+    
+    /// 初始化第一人称渲染器
+    private func initializeFirstPersonRenderer() {
+        guard let device = renderer.metalRenderer.device,
+              let library = renderer.metalRenderer.library else {
+            print("⚠️ 无法获取Metal设备或库，跳过第一人称渲染器初始化")
+            return
+        }
+        
+        firstPersonRenderer = FirstPersonRenderer(device: device, library: library)
+        print("🔫 第一人称渲染器初始化完成")
     }
     
     /// 初始化输入管理器
@@ -228,11 +296,26 @@ class GameEngine: NSObject {
         _ = GameWorldSetup.shared.createSimpleEnemy(at: Float3(-5, 1, -8))
         _ = GameWorldSetup.shared.createSimpleEnemy(at: Float3(2, 1, -15))
         
+        // 初始化第一人称模型
+        initializeFirstPersonModels()
+        
         print("✅ 完整测试场景创建完成")
         print("   包含: 地面、墙壁、目标、敌人、障碍物")
+        print("   第一人称: 武器和手臂模型已加载")
         print("   武器系统: 已激活")
         print("   碰撞检测: 已激活")
         print("🎮 射击游戏已准备就绪 - WASD移动，鼠标视角，左键射击，R键装弹")
+    }
+    
+    /// 初始化第一人称模型
+    private func initializeFirstPersonModels() {
+        // 创建第一人称武器模型
+        let weaponModel = ModelManager.shared.createBuiltInModel(.firstPersonRifle, name: "FirstPersonRifle")
+        print("🔫 第一人称步枪模型创建完成")
+        
+        // 创建第一人称手臂模型  
+        let armsModel = ModelManager.shared.createBuiltInModel(.firstPersonArms, name: "FirstPersonArms")
+        print("🖐 第一人称手臂模型创建完成")
     }
     
     // MARK: - 游戏循环控制
@@ -303,6 +386,9 @@ class GameEngine: NSObject {
         // 更新时间
         timeManager.update()
         
+        // 处理简单快捷键
+        handleSimpleHotkeys()
+        
         // 处理待处理的实体和组件操作
         entityManager.processPendingOperations()
         
@@ -330,8 +416,37 @@ class GameEngine: NSObject {
     func render() {
         guard isRunning && !isPaused else { return }
         
-        // 当前使用测试渲染
-        renderer.renderTestTriangle()
+        // 使用新的第一人称渲染系统
+        renderer.renderScene(firstPersonRenderer: firstPersonRenderer)
+    }
+    
+    /// 设置测试三角形的可见性
+    func setTriangleVisible(_ visible: Bool) {
+        renderer.isTestTriangleVisible = visible
+        print("🎮 GameEngine: 三角形可见性设置为 \(visible ? "可见" : "隐藏")")
+        
+        // 当三角形被设置为可见时，重置为首次出现状态
+        if visible {
+            renderer.resetTriangleToFirstAppearance()
+        }
+    }
+    
+    /// 设置第一人称武器可见性
+    func setWeaponVisible(_ visible: Bool) {
+        firstPersonRenderer?.setWeaponVisible(visible)
+        print("🔫 GameEngine: 武器可见性设置为 \(visible ? "可见" : "隐藏")")
+    }
+    
+    /// 设置第一人称手臂可见性
+    func setArmsVisible(_ visible: Bool) {
+        firstPersonRenderer?.setArmsVisible(visible)
+        print("🖐 GameEngine: 手臂可见性设置为 \(visible ? "可见" : "隐藏")")
+    }
+    
+    /// 播放武器动画
+    func playWeaponAnimation(_ animation: WeaponAnimation) {
+        firstPersonRenderer?.playWeaponAnimation(animation)
+        print("🎬 GameEngine: 播放武器动画 \(animation)")
     }
     
     // MARK: - 调试和状态
@@ -363,6 +478,10 @@ class GameEngine: NSObject {
         
         // 停止游戏循环
         stop()
+        
+        // 清理第一人称渲染器
+        firstPersonRenderer?.cleanup()
+        firstPersonRenderer = nil
         
         // 清理玩家控制器
         if let playerController = playerController {

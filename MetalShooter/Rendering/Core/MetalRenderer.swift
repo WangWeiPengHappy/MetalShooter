@@ -51,6 +51,11 @@ public class MetalRenderer: NSObject {
     /// 帧计数器 - 用于调试
     private var currentFrameIndex = 0
     
+    /// 三角形首次显示状态跟踪
+    private var isTriangleFirstAppearance = true  // 标记三角形是否为首次出现
+    private var triangleCenterFrameCount = 0      // 中心位置帧数计数
+    private let triangleCenterDuration = 60       // 中心位置持续帧数（约1秒@60fps）
+    
     // MARK: - 渲染参数
     
     /// 视口大小
@@ -58,6 +63,23 @@ public class MetalRenderer: NSObject {
     
     /// 清除颜色
     var clearColor: MTLClearColor = MTLClearColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1.0)
+    
+    /// 测试三角形可见性控制
+    var isTestTriangleVisible: Bool = true
+    
+    // MARK: - 玩家模型渲染
+    
+    /// 玩家模型数据
+    private var playerModelData: MetalModelData?
+    
+    /// 玩家模型可见性控制
+    var isPlayerModelVisible: Bool = false {
+        didSet {
+            if isPlayerModelVisible && playerModelData == nil {
+                loadPlayerModel()
+            }
+        }
+    }
     
     // MARK: - 公共访问器（用于测试）
     
@@ -81,6 +103,11 @@ public class MetalRenderer: NSObject {
     
     /// 获取视口大小（用于测试）
     var currentViewportSize: CGSize { return viewportSize }
+    
+    /// MetalRenderer访问器 - 提供对内部组件的访问
+    var metalRenderer: (device: MTLDevice?, library: MTLLibrary?) {
+        return (device: device, library: shaderLibrary)
+    }
 
     // MARK: - 初始化
     
@@ -120,6 +147,9 @@ public class MetalRenderer: NSObject {
         
         // 9. 创建lighting数据缓冲区
         createLightingDataBuffer()
+        
+        // 10. 预加载玩家模型（可选）
+        // loadPlayerModel()
         
         print("✅ MetalRenderer 初始化完成")
         print("   设备: \(device.name)")
@@ -258,26 +288,30 @@ public class MetalRenderer: NSObject {
     
     /// 创建测试三角形顶点缓冲区
     private func createTestTriangleVertexBuffer() {
-        // 创建三角形顶点数据 - 使用更明亮的颜色
+        // 创建三角形顶点数据 - 确保始终显示在窗口中心
+        // NDC坐标系：(0,0)为屏幕中心，x范围[-1,1], y范围[-1,1]
+        let triangleSize: Float = 0.3  // 三角形大小（可调整）
+        
         let vertices: [Vertex] = [
-            Vertex(position: Float3(0.0, 0.6, 0.0),   // 顶部
+            Vertex(position: Float3(0.0, triangleSize, 0.0),           // 顶部中心
                    normal: Float3(0, 0, 1),
                    texCoords: Float2(0.5, 0),
-                   color: Float4(1.0, 0.0, 0.0, 1.0)),     // 纯红色
+                   color: Float4(1.0, 0.0, 0.0, 1.0)),                 // 纯红色
             
-            Vertex(position: Float3(-0.6, -0.6, 0.0), // 左下
+            Vertex(position: Float3(-triangleSize, -triangleSize, 0.0), // 左下
                    normal: Float3(0, 0, 1),
                    texCoords: Float2(0, 1),
-                   color: Float4(0.0, 1.0, 0.0, 1.0)),     // 纯绿色
+                   color: Float4(0.0, 1.0, 0.0, 1.0)),                 // 纯绿色
             
-            Vertex(position: Float3(0.6, -0.6, 0.0),  // 右下
+            Vertex(position: Float3(triangleSize, -triangleSize, 0.0),  // 右下
                    normal: Float3(0, 0, 1),
                    texCoords: Float2(1, 1),
-                   color: Float4(0.0, 0.0, 1.0, 1.0))      // 纯蓝色
+                   color: Float4(0.0, 0.0, 1.0, 1.0))                  // 纯蓝色
         ]
         
         // 调试：打印顶点数据和内存布局
-        print("🔍 顶点数据调试:")
+        print("🔍 窗口中心三角形顶点数据调试:")
+        print("  三角形大小: \(triangleSize)")
         print("  Vertex结构大小: \(MemoryLayout<Vertex>.size) 字节")
         print("  Float3大小: \(MemoryLayout<Float3>.size) 字节, 对齐: \(MemoryLayout<Float3>.alignment)")
         print("  Float4大小: \(MemoryLayout<Float4>.size) 字节, 对齐: \(MemoryLayout<Float4>.alignment)")
@@ -286,6 +320,7 @@ public class MetalRenderer: NSObject {
         for (index, vertex) in vertices.enumerated() {
             print("  顶点 \(index): 位置=\(vertex.position), 颜色=\(vertex.color)")
         }
+        print("  📍 三角形将始终显示在窗口中心位置")
         
         // 创建持久的顶点缓冲区
         guard let vertexBuffer = device.makeBuffer(bytes: vertices,
@@ -396,28 +431,245 @@ public class MetalRenderer: NSObject {
         print("🖥️ 视口大小更新: \(size)")
     }
     
+    /// 渲染场景（包括第一人称视角）
+    func renderScene(firstPersonRenderer: FirstPersonRenderer?) {
+        print("🎬 MetalRenderer.renderScene() 开始")
+        guard let (renderEncoder, commandBuffer) = beginFrame() else { 
+            print("❌ beginFrame() 失败")
+            return 
+        }
+
+        // 更新Uniform缓冲区
+        updateUniformsWithCamera()
+
+        // 调试：显示当前状态
+        print("🔍 渲染状态调试: 三角形可见=\(isTestTriangleVisible), 玩家模型可见=\(isPlayerModelVisible)")
+        
+        // 渲染测试三角形（如果可见）
+        if isTestTriangleVisible {
+            print("🔺 渲染测试三角形")
+            renderTestTriangleContent(encoder: renderEncoder)
+        }
+        
+        // 渲染玩家模型（如果可见）
+        if isPlayerModelVisible {
+            print("🎭 渲染玩家模型")
+            renderPlayerModel(encoder: renderEncoder)
+        }
+
+        // 渲染第一人称视角（武器和手臂）
+        if let fpRenderer = firstPersonRenderer {
+            print("✅ 找到FirstPersonRenderer，开始渲染第一人称视角")
+            renderFirstPersonView(encoder: renderEncoder, firstPersonRenderer: fpRenderer)
+        } else {
+            print("❌ FirstPersonRenderer 为 nil")
+        }
+
+        endFrame(renderEncoder: renderEncoder, commandBuffer: commandBuffer)
+        print("🎬 MetalRenderer.renderScene() 完成")
+    }    /// 渲染测试三角形内容
+    private func renderTestTriangleContent(encoder: MTLRenderCommandEncoder) {
+        encoder.pushDebugGroup("Test Triangle")
+        
+        // 检查是否为首次出现或仍在中心显示阶段
+        if isTriangleFirstAppearance || triangleCenterFrameCount < triangleCenterDuration {
+            print("🔺 渲染三角形在窗口中心 - 帧数: \(triangleCenterFrameCount)/\(triangleCenterDuration)")
+            renderTriangleAtCenter(encoder: encoder)
+            
+            if isTriangleFirstAppearance {
+                isTriangleFirstAppearance = false
+                triangleCenterFrameCount = 0
+            }
+            triangleCenterFrameCount += 1
+        } else {
+            print("🔺 渲染三角形 - 跟随相机/鼠标移动")
+            renderTriangleWithCamera(encoder: encoder)
+        }
+        
+        encoder.popDebugGroup()
+    }
+    
+    /// 在窗口中心渲染三角形（首次出现时使用）
+    private func renderTriangleAtCenter(encoder: MTLRenderCommandEncoder) {
+        encoder.pushDebugGroup("Triangle - Center Position")
+        
+        // 创建固定的矩阵变换 - 保证三角形显示在屏幕中心
+        let identityMatrix = Float4x4.identity
+        let centerViewMatrix = Float4x4.identity
+        let orthographicProjection = Float4x4.orthographicProjection(
+            left: -1.0, right: 1.0, 
+            bottom: -1.0, top: 1.0, 
+            near: -1.0, far: 1.0
+        )
+        
+        // 设置固定的 uniform 数据以确保三角形居中显示
+        var uniforms = Uniforms(
+            modelMatrix: identityMatrix,
+            viewMatrix: centerViewMatrix,
+            projectionMatrix: orthographicProjection
+        )
+        
+        // 使用临时缓冲区传递固定的uniform数据
+        encoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        
+        // 绘制三角形
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        
+        encoder.popDebugGroup()
+        print("📍 三角形已渲染在窗口中心位置")
+    }
+    
+    /// 使用相机变换渲染三角形（正常移动功能）
+    private func renderTriangleWithCamera(encoder: MTLRenderCommandEncoder) {
+        encoder.pushDebugGroup("Triangle - Camera Following")
+        
+        // 使用正常的uniform缓冲区（包含相机变换）
+        encoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
+        encoder.setVertexBuffer(uniformBuffers[currentUniformIndex], offset: 0, index: 1)
+        
+        // 绘制三角形
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        
+        encoder.popDebugGroup()
+        print("📍 三角形跟随相机移动渲染完成")
+    }
+    
+    /// 渲染第一人称视角
+    private func renderFirstPersonView(encoder: MTLRenderCommandEncoder, firstPersonRenderer: FirstPersonRenderer) {
+        print("👁️ 开始渲染第一人称视角")
+        encoder.pushDebugGroup("First Person View")
+
+        // 获取摄像机矩阵
+        if let mainCamera = CameraSystem.shared.getMainCamera() {
+            let viewMatrix = mainCamera.viewMatrix
+            let projMatrix = mainCamera.projectionMatrix
+            print("📷 获取到主相机矩阵")
+
+            // 使用第一人称渲染器渲染
+            firstPersonRenderer.render(encoder: encoder, viewMatrix: viewMatrix, projectionMatrix: projMatrix)
+        } else {
+            print("❌ 无法获取主相机")
+        }
+
+        encoder.popDebugGroup()
+        print("👁️ 第一人称视角渲染完成")
+    }
+    
+    // MARK: - 玩家模型渲染
+    
+    /// 加载玩家模型
+    private func loadPlayerModel() {
+        print("🏗️ 开始加载玩家模型...")
+        
+        do {
+            playerModelData = try PlayerModelLoader.createGeometricWarriorForRenderer(device: device)
+            print("✅ 玩家模型加载成功")
+            
+            // 打印模型统计信息
+            if let data = playerModelData {
+                let materialCount = data.materials.count
+                let renderCommandCount = data.renderCommands.count
+                print("📊 模型统计:")
+                print("   材质数量: \(materialCount)")
+                print("   渲染命令数量: \(renderCommandCount)")
+                print("   索引数量: \(data.indexCount)")
+            }
+        } catch {
+            print("❌ 玩家模型加载失败: \(error)")
+            playerModelData = nil
+        }
+    }
+    
+    /// 渲染玩家模型
+    private func renderPlayerModel(encoder: MTLRenderCommandEncoder) {
+        guard let modelData = playerModelData else {
+            print("❌ 玩家模型数据为空，跳过渲染")
+            return
+        }
+        
+        encoder.pushDebugGroup("Player Model")
+        print("🎭 开始渲染玩家模型")
+        
+        // 设置顶点缓冲区
+        encoder.setVertexBuffer(modelData.vertexBuffer, offset: 0, index: 0)
+        
+        // 设置Uniform缓冲区
+        let uniformBuffer = getCurrentUniformBuffer()
+        encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+        
+        // 设置lighting数据缓冲区
+        encoder.setVertexBuffer(lightingDataBuffer, offset: 0, index: 2)
+        
+        // 按渲染命令渲染
+        for renderCommand in modelData.renderCommands {
+            guard let material = modelData.materials[renderCommand.materialId] else {
+                print("❌ 找不到材质: \(renderCommand.materialId)")
+                continue
+            }
+            
+            print("🎨 渲染材质: \(renderCommand.materialId)")
+            
+            // 这里可以设置材质相关的uniform数据
+            // 暂时使用默认的uniform设置
+            
+            // 渲染这个组件
+            encoder.drawIndexedPrimitives(
+                type: .triangle,
+                indexCount: renderCommand.indexCount,
+                indexType: .uint32,
+                indexBuffer: modelData.indexBuffer,
+                indexBufferOffset: renderCommand.startIndex * MemoryLayout<UInt32>.size
+            )
+        }
+        
+        encoder.popDebugGroup()
+        print("🎭 玩家模型渲染完成")
+    }
+    
+    /// 公共方法：切换玩家模型可见性（与三角形互斥显示）
+    func togglePlayerModelVisibility() {
+        isPlayerModelVisible.toggle()
+        // 互斥逻辑：玩家模型和三角形不能同时显示
+        isTestTriangleVisible = !isPlayerModelVisible
+        
+        if isPlayerModelVisible {
+            print("🔄 切换到玩家模型显示，隐藏三角形和第一人称武器/手臂")
+            // 当显示3D玩家模型时，隐藏第一人称武器和手臂
+            GameEngine.shared.setWeaponVisible(false)
+            GameEngine.shared.setArmsVisible(false)
+        } else {
+            print("🔄 切换到三角形显示，隐藏玩家模型，显示第一人称武器/手臂")
+            // 当显示三角形时，显示第一人称武器和手臂
+            GameEngine.shared.setWeaponVisible(true)
+            GameEngine.shared.setArmsVisible(true)
+        }
+    }
+
     /// 渲染三角形（测试方法）
     func renderTestTriangle() {
+        // 检查三角形是否应该可见
+        guard isTestTriangleVisible else { 
+            print("🔍 三角形不可见,跳过渲染")
+            return 
+        }
+        
         guard let (renderEncoder, commandBuffer) = beginFrame() else { return }
         
         // 更新Uniform缓冲区
         updateUniformsWithCamera()
         
-        // 使用预创建的顶点缓冲区
-        renderEncoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
-        
-        // 设置uniform缓冲区
-        renderEncoder.setVertexBuffer(getCurrentUniformBuffer(), offset: 0, index: 1)
-        
-        // 调试：添加调试组标记
-        renderEncoder.pushDebugGroup("Test Triangle Rendering")
-        
-        // 绘制三角形
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
-        
-        renderEncoder.popDebugGroup()
+        // 渲染测试三角形内容
+        renderTestTriangleContent(encoder: renderEncoder)
         
         endFrame(renderEncoder: renderEncoder, commandBuffer: commandBuffer)
+    }
+    
+    /// 重置三角形为首次出现状态（当Triangle菜单被选中时调用）
+    func resetTriangleToFirstAppearance() {
+        isTriangleFirstAppearance = true
+        triangleCenterFrameCount = 0
+        print("🔄 三角形状态重置为首次出现，将在中心位置显示 \(triangleCenterDuration) 帧")
     }
     
     /// 使用摄像机更新Uniforms
@@ -434,8 +686,17 @@ public class MetalRenderer: NSObject {
         // 获取主摄像机
         if let mainCamera = CameraSystem.shared.getMainCamera() {
             
-            // 模型矩阵（单位矩阵，因为是测试三角形）
-            uniformsPointer.pointee.modelMatrix = Float4x4(1.0)
+            // 根据渲染内容设置模型矩阵
+            if isPlayerModelVisible {
+                // 玩家模型：向前移动5个单位，这样摄像机可以看到它
+                let translation = Float4x4.translation(SIMD3<Float>(0.0, 1.0, -5.0))
+                let scale = Float4x4.scaling(SIMD3<Float>(2.0, 2.0, 2.0)) // 放大2倍便于观察
+                uniformsPointer.pointee.modelMatrix = translation * scale
+                print("🎭 玩家模型世界坐标: 位置=(0.0, 1.0, -5.0), 缩放=2.0倍")
+            } else {
+                // 三角形：使用单位矩阵
+                uniformsPointer.pointee.modelMatrix = Float4x4(1.0)
+            }
             
             // 视图矩阵（从摄像机获取）
             uniformsPointer.pointee.viewMatrix = mainCamera.viewMatrix
