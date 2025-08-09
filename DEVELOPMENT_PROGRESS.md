@@ -88,6 +88,14 @@
 - [x] 边界条件验证 - 窗口边缘像素级测试
 - [x] Mock对象测试 - 完整的测试基础设施
 
+#### 📋 用户界面控制系统 (100%) - **新增完成**
+- [x] 原生macOS菜单集成 - Tools菜单成功添加到菜单栏
+- [x] 三角形可见性控制 - Show/Hide/Toggle Triangle功能
+- [x] 快捷键支持 - ⇧⌘T 切换三角形显示状态
+- [x] IBAction事件处理 - AppDelegate→GameEngine→MetalRenderer控制链
+- [x] 实时渲染控制 - 菜单操作立即生效
+- [x] 状态日志系统 - 完整的操作反馈和调试信息
+
 ### 🔄 规划中功能 (Stage 4-5)
 
 ## 🎯 Stage 4 开发优先级规划
