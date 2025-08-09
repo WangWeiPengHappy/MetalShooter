@@ -1,0 +1,105 @@
+{
+  "materialName": "GeometricWarriorMaterial",
+  "version": "1.0",
+  "description": "几何战士角色材质配置",
+  
+  "baseColor": {
+    "primary": {
+      "r": 0.29,
+      "g": 0.42,
+      "b": 0.28,
+      "a": 1.0
+    },
+    "secondary": {
+      "r": 0.18,
+      "g": 0.29,
+      "b": 0.17,
+      "a": 1.0
+    },
+    "accent": {
+      "r": 1.0,
+      "g": 0.42,
+      "b": 0.21,
+      "a": 1.0
+    },
+    "metallic": {
+      "r": 0.54,
+      "g": 0.54,
+      "b": 0.54,
+      "a": 1.0
+    }
+  },
+  
+  "physicalProperties": {
+    "metallic": 0.7,
+    "roughness": 0.3,
+    "reflectance": 0.8,
+    "clearCoat": 0.0,
+    "clearCoatRoughness": 0.1,
+    "ambientOcclusion": 0.2
+  },
+  
+  "componentMaterials": {
+    "head": {
+      "baseColor": "secondary",
+      "metallic": 0.6,
+      "roughness": 0.4
+    },
+    "torso": {
+      "baseColor": "primary",
+      "metallic": 0.7,
+      "roughness": 0.3
+    },
+    "arms": {
+      "baseColor": "primary",
+      "metallic": 0.7,
+      "roughness": 0.3
+    },
+    "legs": {
+      "baseColor": "primary",
+      "metallic": 0.7,
+      "roughness": 0.3
+    },
+    "armor_plates": {
+      "baseColor": "accent",
+      "metallic": 0.9,
+      "roughness": 0.1
+    },
+    "joints": {
+      "baseColor": "metallic",
+      "metallic": 0.95,
+      "roughness": 0.05
+    }
+  },
+  
+  "textureMapping": {
+    "diffuseMap": "warrior_diffuse_512.png",
+    "normalMap": "warrior_normal_512.png",
+    "roughnessMap": "warrior_roughness_512.png",
+    "metallicMap": "warrior_metallic_512.png",
+    "aoMap": "warrior_ao_512.png"
+  },
+  
+  "shaderProperties": {
+    "shaderType": "PBR",
+    "doubleSided": false,
+    "alphaBlend": false,
+    "castShadows": true,
+    "receiveShadows": true
+  },
+  
+  "lodSettings": {
+    "lod0": {
+      "distance": 0,
+      "materialComplexity": "high"
+    },
+    "lod1": {
+      "distance": 50,
+      "materialComplexity": "medium"
+    },
+    "lod2": {
+      "distance": 100,
+      "materialComplexity": "low"
+    }
+  }
+}
