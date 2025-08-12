@@ -2,23 +2,12 @@ import Foundation
 import Metal
 import simd
 
-// MARK: - 模型组件数据结构
-
-/// 模型组件，代表几何体的一个部分
+// ModelComponent定义（之前缺失导致编译错误）
 struct ModelComponent {
-    /// 顶点数据
     let vertices: [Vertex]
-    
-    /// 索引数据
     let indices: [UInt32]
-    
-    /// 材质ID
     let materialId: String
-    
-    /// 变换信息
-    var transform: Transform
-    
-    /// 组件名称
+    var transform: PlayerTransform
     let name: String
 }
 

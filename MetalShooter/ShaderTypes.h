@@ -29,6 +29,7 @@ typedef NSInteger EnumBackingType;
 // MARK: - 顶点数据结构
 
 /// 顶点输入结构 - 用于着色器顶点输入
+#ifdef __METAL_VERSION__
 typedef struct {
     simd_float3 position [[attribute(0)]];    // 顶点位置
     simd_float3 normal [[attribute(1)]];      // 法线
@@ -36,6 +37,15 @@ typedef struct {
     simd_float4 color [[attribute(3)]];       // 顶点颜色
     simd_float3 tangent [[attribute(4)]];     // 切线（用于法线贴图）
 } VertexIn;
+#else
+typedef struct {
+    simd_float3 position;    // 顶点位置
+    simd_float3 normal;      // 法线
+    simd_float2 texCoords;   // 纹理坐标
+    simd_float4 color;       // 顶点颜色
+    simd_float3 tangent;     // 切线（用于法线贴图）
+} VertexIn;
+#endif
 
 // MARK: - Uniform数据结构
 

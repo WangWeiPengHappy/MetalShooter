@@ -93,6 +93,47 @@
    - 在Xcode中选择你的目标设备
    - 按 `Cmd+R` 运行项目
 
+### 🧷 命令行快速启动 (run_game.sh)
+
+仓库根目录提供统一脚本 `run_game.sh` 用于构建与运行/日志收集（已整合原有多个脚本）。
+
+基本用法:
+```bash
+./run_game.sh            # 默认: 构建 + 运行 + 持续 tail 完整日志
+./run_game.sh --mode keylog   # 构建 + 输出关键初始化日志 + 打开GUI (不持续跟随)
+./run_game.sh --mode open     # 构建后仅打开 .app (不追加运行期日志)
+```
+
+可选参数:
+```text
+--config Debug|Release      构建配置 (默认 Debug)
+--derived PATH              自定义 DerivedData 输出目录 (默认 DerivedSimple)
+--mode run|keylog|open      运行模式 (run=完整日志; keylog=截取关键; open=只启动)
+--verbose-build             显示完整 xcodebuild 输出 (否则使用 -quiet)
+--help / -h                 打印帮助
+```
+
+示例:
+```bash
+# Release 构建并运行
+./run_game.sh --config Release
+
+# 自定义 DerivedData 目录并查看关键日志
+./run_game.sh --derived /tmp/DS1 --mode keylog
+
+# 显示详细编译输出
+./run_game.sh --verbose-build
+```
+
+日志输出:
+```
+logs/run_<mode>_<timestamp>.log  # 每次运行自动生成
+```
+
+关键日志筛选 (keylog 模式) 包括: 模型解析 / OBJ 选择 / 包围盒 / 空模型警告 / 渲染状态等关键信息。
+
+若需长期留存日志，保留 `logs/` 目录即可；该目录已在 .gitignore 中避免污染版本库。
+
 ### 🎮 游戏控制
 
 - **WASD**: 移动（W前进，A左移，S后退，D右移）

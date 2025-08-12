@@ -46,7 +46,10 @@ public class MetalRenderer: NSObject {
     private var testTriangleVertexBuffer: MTLBuffer!
     
     /// Lighting数据缓冲区
-    private var lightingDataBuffer: MTLBuffer!
+    private var lightingDataBuffer: MTLBuffer! // 用于基础光照(BasicLightingData)
+    private var printedLightingDebugFrames = 0
+    private var autoRotateAngle: Float = 0
+    var enableAutoRotate: Bool = true
     
     /// 帧计数器 - 用于调试
     private var currentFrameIndex = 0
@@ -62,7 +65,7 @@ public class MetalRenderer: NSObject {
     private var viewportSize: CGSize = CGSize(width: 800, height: 600)
     
     /// 清除颜色
-    var clearColor: MTLClearColor = MTLClearColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1.0)
+    var clearColor: MTLClearColor = MTLClearColor(red: 0.25, green: 0.28, blue: 0.35, alpha: 1.0) // 稍微亮一些的背景营造体积感
     
     /// 测试三角形可见性控制
     var isTestTriangleVisible: Bool = true
@@ -71,6 +74,8 @@ public class MetalRenderer: NSObject {
     
     /// 玩家模型数据
     private var playerModelData: MetalModelData?
+    /// 玩家模型包围盒 (用于自适应缩放与定位)
+    private var playerModelBoundingBox: BoundingBox?
     
     /// 玩家模型可见性控制
     var isPlayerModelVisible: Bool = false {
@@ -78,6 +83,13 @@ public class MetalRenderer: NSObject {
             if isPlayerModelVisible && playerModelData == nil {
                 loadPlayerModel()
             }
+        }
+    }
+
+    /// 确保玩家模型数据已加载（外部在状态同步后可显式调用）
+    func ensurePlayerModelLoaded() {
+        if playerModelData == nil {
+            loadPlayerModel()
         }
     }
     
@@ -210,8 +222,9 @@ public class MetalRenderer: NSObject {
     
     /// 创建渲染管线状态
     private func createRenderPipeline() {
-        guard let vertexFunction = shaderLibrary.makeFunction(name: "vertex_simple"),
-              let fragmentFunction = shaderLibrary.makeFunction(name: "fragment_color_debug") else {
+    let useNormalVis = ProcessInfo.processInfo.environment["MSHOW_NORMALS"] == "1"
+    guard let vertexFunction = shaderLibrary.makeFunction(name: "vertex_simple"),
+        let fragmentFunction = shaderLibrary.makeFunction(name: useNormalVis ? "fragment_normals" : "fragment_basic_lighting") else {
             fatalError("❌ 无法加载着色器函数")
         }
         
@@ -258,7 +271,7 @@ public class MetalRenderer: NSObject {
         
         do {
             renderPipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
-            print("🔧 渲染管线创建成功")
+            print("🔧 渲染管线创建成功 (fragment=\(useNormalVis ? "fragment_normals" : "fragment_basic_lighting"))")
         } catch {
             fatalError("❌ 无法创建渲染管线: \(error)")
         }
@@ -353,9 +366,13 @@ public class MetalRenderer: NSObject {
     
     /// 创建Lighting数据缓冲区
     private func createLightingDataBuffer() {
-        let lightingDataSize = MemoryLayout<LightingData>.size
+    var stride = MemoryLayout<BasicLightingData>.stride
+    if stride != 64 {
+        print("⚠️ BasicLightingData stride=\(stride) != 64 (期望Metal对齐到4个float4). 强制使用64字节缓冲避免片段读取错位。")
+        stride = 64
+    }
         
-        guard let buffer = device.makeBuffer(length: lightingDataSize, options: .storageModeShared) else {
+        guard let buffer = device.makeBuffer(length: stride, options: .storageModeShared) else {
             fatalError("❌ 无法创建lighting数据缓冲区")
         }
         
@@ -363,10 +380,10 @@ public class MetalRenderer: NSObject {
         self.lightingDataBuffer = buffer
         
         // 初始化默认的lighting数据
-        let bufferPointer = buffer.contents().bindMemory(to: LightingData.self, capacity: 1)
-        bufferPointer.pointee = LightingData()
+    var initial = BasicLightingData()
+    memcpy(buffer.contents(), &initial, MemoryLayout<BasicLightingData>.stride)
         
-        print("💡 Lighting数据缓冲区创建成功 (大小: \(lightingDataSize) 字节)")
+    print("💡 Lighting数据缓冲区创建成功 (CPU stride=\(MemoryLayout<BasicLightingData>.stride) 实际分配=\(stride) 字节)")
     }
     
     // MARK: - 渲染方法
@@ -513,7 +530,9 @@ public class MetalRenderer: NSObject {
         encoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         
-        // 绘制三角形
+    // 绑定光照缓冲 (保证片段阶段也能取到默认光照, 即便只是三角形调试)
+    encoder.setFragmentBuffer(lightingDataBuffer, offset: 0, index: 2)
+    // 绘制三角形
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         
         encoder.popDebugGroup()
@@ -528,7 +547,8 @@ public class MetalRenderer: NSObject {
         encoder.setVertexBuffer(testTriangleVertexBuffer, offset: 0, index: 0)
         encoder.setVertexBuffer(uniformBuffers[currentUniformIndex], offset: 0, index: 1)
         
-        // 绘制三角形
+    encoder.setFragmentBuffer(lightingDataBuffer, offset: 0, index: 2)
+    // 绘制三角形
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         
         encoder.popDebugGroup()
@@ -563,8 +583,17 @@ public class MetalRenderer: NSObject {
         print("🏗️ 开始加载玩家模型...")
         
         do {
-            playerModelData = try PlayerModelLoader.createGeometricWarriorForRenderer(device: device)
-            print("✅ 玩家模型加载成功")
+            // 使用当前版本（可能是Blender/程序生成/未来的专业版）
+            playerModelData = try PlayerModelLoader.shared.loadCurrentPlayerModelForMetal(device: device)
+            print("✅ 玩家模型加载成功 (当前版本)")
+            // 同步缓存逻辑模型以取得包围盒数据
+            let logicalModel = PlayerModelLoader.shared.loadCurrentPlayerModel()
+            playerModelBoundingBox = logicalModel.boundingBox
+            let bb = logicalModel.boundingBox
+            print("📦 玩家模型包围盒: min=\(bb.min) max=\(bb.max) size=\(bb.size)")
+            if logicalModel.totalVertices == 0 || playerModelData?.indexCount == 0 {
+                print("⚠️ 警告: 玩家模型为空 (顶点或索引为0)。请检查 OBJ 资源与解析。")
+            }
             
             // 打印模型统计信息
             if let data = playerModelData {
@@ -583,8 +612,16 @@ public class MetalRenderer: NSObject {
     
     /// 渲染玩家模型
     private func renderPlayerModel(encoder: MTLRenderCommandEncoder) {
+        if playerModelData == nil {
+            print("🛠️ 玩家模型数据缺失，尝试即时加载...")
+            loadPlayerModel()
+        }
         guard let modelData = playerModelData else {
-            print("❌ 玩家模型数据为空，跳过渲染")
+            print("❌ 玩家模型数据仍为空，跳过渲染")
+            return
+        }
+        if modelData.indexCount == 0 {
+            print("⚠️ 玩家模型索引数量为0，跳过渲染")
             return
         }
         
@@ -598,8 +635,9 @@ public class MetalRenderer: NSObject {
         let uniformBuffer = getCurrentUniformBuffer()
         encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
         
-        // 设置lighting数据缓冲区
-        encoder.setVertexBuffer(lightingDataBuffer, offset: 0, index: 2)
+    // 设置 lighting 数据缓冲区 (顶点 + 片段, 片段用于光照计算)
+    encoder.setVertexBuffer(lightingDataBuffer, offset: 0, index: 2)
+    encoder.setFragmentBuffer(lightingDataBuffer, offset: 0, index: 2)
         
         // 按渲染命令渲染
         for renderCommand in modelData.renderCommands {
@@ -676,6 +714,8 @@ public class MetalRenderer: NSObject {
     private func updateUniformsWithCamera() {
         let uniformBuffer = getCurrentUniformBuffer()
         let uniformsPointer = uniformBuffer.contents().bindMemory(to: Uniforms.self, capacity: 1)
+    // 同步基础光照数据（简单方向光 + 环境光），保证 fragment_basic_lighting 获得最新摄像机位置
+    updateBasicLightingData()
         
         // 添加更详细的调试信息
         if currentFrameIndex % 60 == 0 {
@@ -688,13 +728,36 @@ public class MetalRenderer: NSObject {
             
             // 根据渲染内容设置模型矩阵
             if isPlayerModelVisible {
-                // 玩家模型：向前移动5个单位，这样摄像机可以看到它
-                let translation = Float4x4.translation(SIMD3<Float>(0.0, 1.0, -5.0))
-                let scale = Float4x4.scaling(SIMD3<Float>(2.0, 2.0, 2.0)) // 放大2倍便于观察
-                uniformsPointer.pointee.modelMatrix = translation * scale
-                print("🎭 玩家模型世界坐标: 位置=(0.0, 1.0, -5.0), 缩放=2.0倍")
+                // 基于包围盒自适应缩放与居中
+                if let bb = playerModelBoundingBox {
+                    let size = bb.size
+                    let height = max(size.y, 0.0001)
+                    let desiredHeight: Float = 2.0  // 目标高度（世界单位）
+                    let scaleFactor = desiredHeight / height
+                    // 包围盒中心（缩放后）
+                    let centerX = (bb.min.x + bb.max.x) * 0.5 * scaleFactor
+                    let centerY = (bb.min.y + bb.max.y) * 0.5 * scaleFactor
+                    let centerZ = (bb.min.z + bb.max.z) * 0.5 * scaleFactor
+                    // 让模型中心位于窗口中心 (0,0) ，并固定到 -5 的深度（不再额外偏移 centerZ，避免深度漂移）
+                    let distance: Float = 5.0
+                    let translation = Float4x4.translation(SIMD3<Float>(-centerX, -centerY, -distance))
+                    let scale = Float4x4.scaling(SIMD3<Float>(repeating: scaleFactor))
+                    var modelM = translation * scale
+                    if enableAutoRotate {
+                        autoRotateAngle += 0.01
+                        modelM = modelM * Float4x4.rotationY(autoRotateAngle)
+                    }
+                    uniformsPointer.pointee.modelMatrix = modelM
+                    if currentFrameIndex % 60 == 0 {
+                        print("🎯 玩家模型居中: height=\(String(format: "%.3f", height)) scale=\(String(format: "%.3f", scaleFactor)) center=(\(centerX), \(centerY), \(centerZ)) dist=\(distance)")
+                    }
+                } else {
+                    // 若无包围盒则使用后备矩阵
+                    let translation = Float4x4.translation(SIMD3<Float>(0.0, 1.0, -5.0))
+                    let scale = Float4x4.scaling(SIMD3<Float>(2.0, 2.0, 2.0))
+                    uniformsPointer.pointee.modelMatrix = translation * scale
+                }
             } else {
-                // 三角形：使用单位矩阵
                 uniformsPointer.pointee.modelMatrix = Float4x4(1.0)
             }
             
@@ -738,6 +801,34 @@ public class MetalRenderer: NSObject {
             [0, 0, -1, 0]
         ])
     }
+}
+
+// MARK: - 基础光照数据填充
+extension MetalRenderer {
+    /// 填充一个基础的方向光和环境光，提升玩家模型立体感
+    private func updateBasicLightingData() {
+        guard let rawPtr = lightingDataBuffer?.contents() else { return }
+        var data = BasicLightingData(
+            ambientColor: SIMD3<Float>(0.18,0.19,0.21),
+            cameraPosition: CameraSystem.shared.getMainCamera()?.position ?? SIMD3<Float>(0,0,5),
+            lightDirection: normalize(SIMD3<Float>(0.4,-1.0,0.35)),
+            lightIntensity: 2.6,
+            lightColor: SIMD3<Float>(1.0,0.94,0.85)
+        )
+        memcpy(rawPtr, &data, MemoryLayout<BasicLightingData>.stride)
+        if printedLightingDebugFrames < 3 {
+            printedLightingDebugFrames += 1
+            print("💡 BasicLightingData 写入: ambient=\(data.ambientColor) dir=\(data.lightDirection) intensity=\(data.lightIntensity) color=\(data.lightColor)")
+        }
+    }
+}
+
+// 与着色器 BasicLightingData 对应的CPU端结构
+fileprivate struct BasicLightingData {
+    var ambientColor: SIMD3<Float> = .zero; var padding0: Float = 0
+    var cameraPosition: SIMD3<Float> = .zero; var padding1: Float = 0
+    var lightDirection: SIMD3<Float> = SIMD3<Float>(0,-1,0); var lightIntensity: Float = 1
+    var lightColor: SIMD3<Float> = SIMD3<Float>(1,1,1); var padding2: Float = 0
 }
 
 // MARK: - MTKViewDelegate

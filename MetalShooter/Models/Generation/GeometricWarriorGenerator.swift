@@ -1,3 +1,4 @@
+// PlayerTransform 位于同target可直接使用
 import Foundation
 import Metal
 import simd
@@ -36,7 +37,7 @@ class GeometricWarriorGenerator {
     /// 生成头部
     private func generateHead() -> ModelComponent {
         let (vertices, indices) = GeometryPrimitives.generateSphere(radius: 0.25, longitudeSegments: 16, latitudeSegments: 12)
-        let transform = Transform(
+    let transform = PlayerTransform(
             position: simd_float3(0, 1.4, 0),
             rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1), // 无旋转
             scale: simd_float3(1, 1, 1)
@@ -54,7 +55,7 @@ class GeometricWarriorGenerator {
     /// 生成躯干
     private func generateTorso() -> ModelComponent {
         let (vertices, indices) = GeometryPrimitives.generateBox(width: 1.0, height: 1.4, depth: 0.7)
-        let transform = Transform(
+    let transform = PlayerTransform(
             position: simd_float3(0, 0.3, 0),
             rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
             scale: simd_float3(1, 1, 1)
@@ -79,7 +80,7 @@ class GeometricWarriorGenerator {
             vertices: leftArmVertices,
             indices: leftArmIndices,
             materialId: "limb_material",
-            transform: Transform(
+            transform: PlayerTransform(
                 position: simd_float3(-0.65, 0.5, 0),
                 rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
                 scale: simd_float3(1, 1, 1)
@@ -93,7 +94,7 @@ class GeometricWarriorGenerator {
             vertices: rightArmVertices,
             indices: rightArmIndices,
             materialId: "limb_material",
-            transform: Transform(
+            transform: PlayerTransform(
                 position: simd_float3(0.65, 0.5, 0),
                 rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
                 scale: simd_float3(1, 1, 1)
@@ -107,7 +108,7 @@ class GeometricWarriorGenerator {
             vertices: leftLegVertices,
             indices: leftLegIndices,
             materialId: "limb_material",
-            transform: Transform(
+            transform: PlayerTransform(
                 position: simd_float3(-0.3, -0.7, 0),
                 rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
                 scale: simd_float3(1, 1, 1)
@@ -121,7 +122,7 @@ class GeometricWarriorGenerator {
             vertices: rightLegVertices,
             indices: rightLegIndices,
             materialId: "limb_material",
-            transform: Transform(
+            transform: PlayerTransform(
                 position: simd_float3(0.3, -0.7, 0),
                 rotation: simd_quatf(ix: 0, iy: 0, iz: 0, r: 1),
                 scale: simd_float3(1, 1, 1)

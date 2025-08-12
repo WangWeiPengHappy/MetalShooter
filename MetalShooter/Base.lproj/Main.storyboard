@@ -744,6 +744,7 @@
                         <outlet property="mouseCaptureMenuItem" destination="MSE-capture-item" id="MSE-capture-outlet"/>
                         <outlet property="weaponMenuItem" destination="WPN-checkbox-item" id="WPN-checkbox-outlet"/>
                         <outlet property="armsMenuItem" destination="ARM-checkbox-item" id="ARM-checkbox-outlet"/>
+                        <outlet property="showGamesMenuItem" destination="showGames-menu-item" id="showGames-outlet"/>
                     </connections>
                 </customObject>
                 <customObject id="YLy-65-1bz" customClass="NSFontManager"/>

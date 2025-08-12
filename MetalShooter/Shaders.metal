@@ -492,6 +492,38 @@ fragment float4 fragment_color_debug(VertexOut in [[stage_in]]) {
     return color;
 }
 
+// 基础方向光+环境光+简单高光 (Blinn-Phong) 着色器，用于玩家模型快速获得立体感
+struct BasicLightingData {
+    float3 ambientColor; float padding0;
+    float3 cameraPosition; float padding1;
+    float3 lightDirection; float lightIntensity;
+    float3 lightColor; float padding2;
+};
+
+fragment float4 fragment_basic_lighting(VertexOut in [[stage_in]],
+                                       constant BasicLightingData &lighting [[buffer(2)]]) {
+    float3 N = normalize(in.normal);
+    float3 V = normalize(lighting.cameraPosition - in.worldPosition);
+    float3 L = normalize(-lighting.lightDirection);
+    float NdotL = max(dot(N, L), 0.0);
+    float3 H = normalize(L + V);
+    float specularFactor = pow(max(dot(N, H), 0.0), 48.0);
+    float3 baseColor = in.color.rgb;
+    if (all(baseColor > float3(0.95))) baseColor = float3(0.78,0.76,0.74);
+    float3 ambient = lighting.ambientColor * baseColor;
+    float3 diffuse = baseColor * NdotL * lighting.lightColor * lighting.lightIntensity;
+    float3 specular = lighting.lightColor * lighting.lightIntensity * specularFactor;
+    float3 color = ambient + diffuse + specular;
+    color = pow(clamp(color,0.0,1.0), float3(1.0/2.2));
+    return float4(color,1.0);
+}
+
+// 调试：直接输出法线颜色，可用于验证 OBJ 法线是否正确
+fragment float4 fragment_normals(VertexOut in [[stage_in]]) {
+    float3 N = normalize(in.normal) * 0.5 + 0.5; // 映射到[0,1]
+    return float4(N, 1.0);
+}
+
 // 新的调试着色器 - 基于位置测试颜色属性是否正确传递
 fragment float4 fragment_attribute_debug(VertexOut in [[stage_in]]) {
     // 基于顶点位置返回预期颜色来测试属性传递

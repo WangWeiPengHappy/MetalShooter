@@ -12,6 +12,7 @@
 		B4A426BA2E438FD70069E3ED /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4A426B92E438FD70069E3ED /* AVFoundation.framework */; };
 		B4A426BC2E438FE20069E3ED /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4A426BB2E438FE20069E3ED /* GameController.framework */; };
 		B4A427DD2E439B030069E3ED /* libswiftsimd.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B4A427DC2E439B030069E3ED /* libswiftsimd.tbd */; };
+		B4AE50DC2E4B3BAC00020F89 /* playerModel2.obj in Resources */ = {isa = PBXBuildFile; fileRef = B4AE50DB2E4B3B8500020F89 /* playerModel2.obj */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +41,8 @@
 		B4A426B92E438FD70069E3ED /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		B4A426BB2E438FE20069E3ED /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		B4A427DC2E439B030069E3ED /* libswiftsimd.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libswiftsimd.tbd; path = usr/lib/swift/libswiftsimd.tbd; sourceTree = SDKROOT; };
+		B4AE50DA2E4B3B8500020F89 /* playerModel2.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; name = playerModel2.mtl; path = Models/Player/playerModel2.mtl; sourceTree = "<group>"; };
+		B4AE50DB2E4B3B8500020F89 /* playerModel2.obj */ = {isa = PBXFileReference; lastKnownFileType = text; name = playerModel2.obj; path = Models/Player/playerModel2.obj; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -141,6 +144,8 @@
 		B4A4274B2E43969E0069E3ED /* Assets */ = {
 			isa = PBXGroup;
 			children = (
+				B4AE50DA2E4B3B8500020F89 /* playerModel2.mtl */,
+				B4AE50DB2E4B3B8500020F89 /* playerModel2.obj */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -265,6 +270,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4AE50DC2E4B3BAC00020F89 /* playerModel2.obj in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -68,6 +68,9 @@ class GameEngine: NSObject {
     
     /// 上次快捷键触发时间
     private var lastHotkeyTime: Float = 0.0
+
+    /// 是否处于ShowGames模式（显示外部OBJ PlayerModel）
+    private var showGamesMode: Bool = false
     
     // MARK: - 公共访问器（用于测试）
     
@@ -104,8 +107,27 @@ class GameEngine: NSObject {
             // 使用简单的时间间隔防止重复触发
             let currentTime = timeManager.totalTime
             if currentTime - lastHotkeyTime > 0.3 { // 300ms间隔
-                print("🔑 GameEngine: P键触发间隔检查通过，调用togglePlayerModelVisibility")
-                renderer?.togglePlayerModelVisibility()
+                print("🔑 GameEngine: P键触发间隔检查通过")
+                // 只有在非ShowGames模式且Triangle模式下才响应P键
+                if !showGamesMode {
+                    if renderer.isPlayerModelVisible {
+                        // 如果当前显示的是程序生成模型并且P再次按下 -> 回到三角形
+                        if PlayerModelLoader.shared.currentVersion == .generated {
+                            print("🔄 P键: 隐藏程序生成玩家模型，回到三角形")
+                            hidePlayerModelShowTriangle()
+                        } else {
+                            // 如果当前显示的不是generated（意外情况），仍然切回triangle
+                            print("⚠️ 当前版本非generated却处于玩家模型显示，回退到三角形")
+                            hidePlayerModelShowTriangle()
+                        }
+                    } else {
+                        // 当前是Triangle -> 切换到程序生成玩家模型
+                        print("🔄 P键: Triangle -> 显示程序生成玩家模型")
+                        showGeneratedPlayerModel()
+                    }
+                } else {
+                    print("ℹ️ 处于ShowGames模式，P键不执行切换")
+                }
                 lastHotkeyTime = currentTime
             } else {
                 print("🔑 GameEngine: P键触发间隔未满，跳过")
@@ -194,18 +216,25 @@ class GameEngine: NSObject {
         guard let window = gameWindow else {
             fatalError("❌ 游戏窗口未创建")
         }
-        
-        metalView = MTKView(frame: window.contentView?.bounds ?? NSRect.zero)
-        metalView?.autoresizingMask = [.width, .height]
-        
-        // 配置Metal视图
-        metalView?.preferredFramesPerSecond = 60
-        metalView?.enableSetNeedsDisplay = false
-        metalView?.isPaused = false
-        
-        window.contentView = metalView
-        
-        print("🖥️ Metal视图创建成功")
+        // 直接替换窗口内容视图（还原简化逻辑）
+        metalView = MTKView(frame: window.contentView?.bounds ?? window.frame)
+        if let mv = metalView {
+            mv.autoresizingMask = [.width, .height]
+            mv.preferredFramesPerSecond = 60
+            mv.enableSetNeedsDisplay = false
+            mv.isPaused = false
+            mv.clearColor = MTLClearColor(red: 0.15, green: 0.18, blue: 0.22, alpha: 1.0)
+            window.contentView = mv
+            print("🖥️ Metal视图创建并替换 contentView: size=\(mv.bounds.size)")
+        } else {
+            print("❌ 创建MTKView失败")
+        }
+        if let mainMenu = NSApp.mainMenu {
+            let titles = mainMenu.items.map { $0.title }
+            print("📋 当前主菜单项: \(titles)")
+        } else {
+            print("⚠️ 主菜单为 nil")
+        }
     }
     
     /// 初始化渲染器
@@ -309,12 +338,12 @@ class GameEngine: NSObject {
     
     /// 初始化第一人称模型
     private func initializeFirstPersonModels() {
-        // 创建第一人称武器模型
-        let weaponModel = ModelManager.shared.createBuiltInModel(.firstPersonRifle, name: "FirstPersonRifle")
+    // 创建第一人称武器模型（无需保存返回值）
+    _ = ModelManager.shared.createBuiltInModel(.firstPersonRifle, name: "FirstPersonRifle")
         print("🔫 第一人称步枪模型创建完成")
         
-        // 创建第一人称手臂模型  
-        let armsModel = ModelManager.shared.createBuiltInModel(.firstPersonArms, name: "FirstPersonArms")
+    // 创建第一人称手臂模型  
+    _ = ModelManager.shared.createBuiltInModel(.firstPersonArms, name: "FirstPersonArms")
         print("🖐 第一人称手臂模型创建完成")
     }
     
@@ -429,6 +458,54 @@ class GameEngine: NSObject {
         if visible {
             renderer.resetTriangleToFirstAppearance()
         }
+    }
+
+    // MARK: - 显示模式控制 API
+
+    /// 设置ShowGames模式（显示外部OBJ PlayerModel）
+    func setShowGamesMode(_ on: Bool) {
+        showGamesMode = on
+        if on {
+            print("🟢 进入ShowGames模式: 切换到BlenderMCP PlayerModel并显示")
+            PlayerModelLoader.shared.switchToVersion(.blenderMCP)
+            _ = PlayerModelLoader.shared.loadCurrentPlayerModel()
+            renderer.isPlayerModelVisible = true
+            renderer.isTestTriangleVisible = false
+            // 确保模型数据立即加载（防止可见性早于渲染器完成初始化时错过 didSet）
+            renderer.ensurePlayerModelLoaded()
+            // 打印OBJ解析调试信息
+            let info = PlayerModelLoader.shared.debugExternalOBJResolutionInfo()
+            print("🧾 PlayerModel外部OBJ解析: \(info)")
+            // 隐藏第一人称武器/手臂
+            setWeaponVisible(false)
+            setArmsVisible(false)
+        } else {
+            print("🟡 退出ShowGames模式: 隐藏玩家模型, 不自动显示三角形")
+            renderer.isPlayerModelVisible = false
+            renderer.isTestTriangleVisible = false
+            // 恢复武器/手臂
+            setWeaponVisible(true)
+            setArmsVisible(true)
+        }
+    }
+
+    /// 显示程序生成玩家模型（用于Triangle模式下P键）
+    func showGeneratedPlayerModel() {
+        PlayerModelLoader.shared.switchToVersion(.generated)
+        _ = PlayerModelLoader.shared.loadCurrentPlayerModel()
+        renderer.isPlayerModelVisible = true
+        renderer.isTestTriangleVisible = false
+        setWeaponVisible(false)
+        setArmsVisible(false)
+    }
+
+    /// 隐藏玩家模型，显示三角形
+    func hidePlayerModelShowTriangle() {
+        renderer.isPlayerModelVisible = false
+        renderer.isTestTriangleVisible = true
+        // 恢复武器/手臂
+        setWeaponVisible(true)
+        setArmsVisible(true)
     }
     
     /// 设置第一人称武器可见性
