@@ -127,7 +127,6 @@ test_vertex_layout.swift
 # Build artifacts
 build/
 
-# AI对话上下文文件（隐私保护）
-.ai-context/
+# AI对话上下文文件（移除 ignore 以纳入版本控制）
 .claude/
 test_*.txt
